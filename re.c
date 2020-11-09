@@ -12,12 +12,12 @@ typedef struct BUCKET
 {
     int range_array_len;
     int indiv_array_len;
-    char range_array_start[98];
-    char range_array_end[98];
-    char indiv_array[98];
+    char *range_array_start;
+    char *range_array_end;
+    char *indiv_array;
 } BUCKET;
 
-void re_bucket_reset(BUCKET *);
+BUCKET *create_bucket(int len);
 SPAN *re_init_span(char *);
 SPAN *re_match(char *pat, char *text);
 void re_match_here(char *pat, char *text, SPAN *span);
@@ -59,95 +59,73 @@ void re_match_here(char *pat, char *text, SPAN *span)
             span->valid = 1;
         return;
     }
-    BUCKET bucket;
-    re_bucket_reset(&bucket);
+    BUCKET *bucket = create_bucket(30);
+    int close;
     if (pat[0] == '[')
     {
-        int close = 1;
+        close = 1;
         while (pat[close] != ']')
         {
             if (pat[close] == '-')
             {
-                bucket.range_array_start[bucket.range_array_len] = pat[close - 1];
-                bucket.range_array_end[bucket.range_array_len++] = pat[close + 1];
+                bucket->range_array_start[bucket->range_array_len] = pat[close - 1];
+                bucket->range_array_end[bucket->range_array_len++] = pat[close + 1];
             }
             if (pat[close] != '-' && pat[close - 1] != '-' && pat[close + 1] != '-')
             {
-                bucket.indiv_array[bucket.indiv_array_len++] = pat[close];
+                bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
             }
             close++;
         }
-        if (pat[close + 1] == '*')
-        {
-            if (pat[close + 2] == '?')
-                re_match_star(&bucket, pat + close + 3, text, span, 0);
-            else
-                re_match_star(&bucket, pat + close + 2, text, span, 1);
-        }
-        else if (pat[close + 1] == '+')
-        {
-            if (pat[close + 2] == '?')
-                re_match_plus(&bucket, pat + close + 3, text, span, 0);
-            else
-                re_match_plus(&bucket, pat + close + 2, text, span, 1);
-        }
-        else if (pat[close + 1] == '?')
-        {
-            if (pat[close + 2] == '?')
-                re_match_question(&bucket, pat + close + 3, text, span, 0);
-            else
-                re_match_question(&bucket, pat + close + 2, text, span, 1);
-        }
-        else
-        {
-            if (re_in_bucket(&bucket,*text))
-                re_match_here(pat+close+1,text+1,span);
-        }
-        return;
     }
-    if(pat[0]=='\\' && (pat[1]=='w'||pat[1]=='d'))
+    else if (pat[0] == '\\' && (pat[1] == 'w' || pat[1] == 'd'))
     {
-        bucket.range_array_len=1;
-        if(pat[1]=='w')
+        bucket->range_array_len = 1;
+        bucket->range_array_start[0] = '0';
+        bucket->range_array_end[0] = '9';
+        if (pat[1] == 'w')
         {
-            bucket.range_array_len=3;
-            bucket.range_array_start[0]='A';
-            bucket.range_array_start[1]='a';
-            bucket.range_array_end[0]='Z';
-            bucket.range_array_end[1]='z';
-            bucket.indiv_array_len=1;
-            bucket.indiv_array[0]='_';
+            bucket->range_array_len = 3;
+            bucket->range_array_start[1] = 'A';
+            bucket->range_array_start[2] = 'a';
+            bucket->range_array_end[1] = 'Z';
+            bucket->range_array_end[2] = 'z';
+            bucket->indiv_array_len = 1;
+            bucket->indiv_array[0] = '_';
         }
-        bucket.range_array_start[2]='0';
-        bucket.range_array_end[2]='9';
-        int close=1;
-        if (pat[close + 1] == '*')
-        {
-            if (pat[close + 2] == '?')
-                re_match_star(&bucket, pat + close + 3, text, span, 0);
-            else
-                re_match_star(&bucket, pat + close + 2, text, span, 1);
-        }
-        else if (pat[close + 1] == '+')
-        {
-            if (pat[close + 2] == '?')
-                re_match_plus(&bucket, pat + close + 3, text, span, 0);
-            else
-                re_match_plus(&bucket, pat + close + 2, text, span, 1);
-        }
-        else if (pat[close + 1] == '?')
-        {
-            if (pat[close + 2] == '?')
-                re_match_question(&bucket, pat + close + 3, text, span, 0);
-            else
-                re_match_question(&bucket, pat + close + 2, text, span, 1);
-        }
+        close = 1;
+    }
+    else
+    {
+        bucket->indiv_array_len = 1;
+        bucket->indiv_array[0] = pat[0];
+        close = 0;
+    }
+    if (pat[close + 1] == '*')
+    {
+        if (pat[close + 2] == '?')
+            re_match_star(bucket, pat + close + 3, text, span, 0);
         else
-        {
-            if (re_in_bucket(&bucket,*text))
-                re_match_here(pat+close+1,text+1,span);
-        }
-        return;
+            re_match_star(bucket, pat + close + 2, text, span, 1);
+    }
+    else if (pat[close + 1] == '+')
+    {
+        if (pat[close + 2] == '?')
+            re_match_plus(bucket, pat + close + 3, text, span, 0);
+        else
+            re_match_plus(bucket, pat + close + 2, text, span, 1);
+    }
+    else if (pat[close + 1] == '?')
+    {
+        if (pat[close + 2] == '?')
+            re_match_question(bucket, pat + close + 3, text, span, 0);
+        else
+            re_match_question(bucket, pat + close + 2, text, span, 1);
+    }
+    else
+    {
+        if (re_in_bucket(bucket, *text))
+            re_match_here(pat + close + 1, text + 1, span);
     }
     return;
 }
@@ -195,7 +173,6 @@ void re_match_plus(BUCKET *bucket, char *pat, char *text, SPAN *span, int greedy
             re_match_here(pat, ++text, span);
             if (span->valid)
                 return;
-            text++;
         }
         span->valid = 0;
         return;
@@ -252,10 +229,15 @@ SPAN *re_init_span(char *c)
     return span;
 }
 
-void re_bucket_reset(BUCKET *bucket)
+BUCKET *create_bucket(int len)
 {
+    BUCKET *bucket = (BUCKET *)malloc(sizeof(BUCKET));
     bucket->range_array_len = 0;
     bucket->indiv_array_len = 0;
+    bucket->indiv_array = (char *)malloc(len * sizeof(char));
+    bucket->range_array_start = (char *)malloc(len * sizeof(char));
+    bucket->range_array_end = (char *)malloc(len * sizeof(char));
+    return bucket;
 }
 
 int re_in_bucket(BUCKET *bucket, char c)
@@ -279,8 +261,8 @@ int re_in_bucket(BUCKET *bucket, char c)
 
 int main()
 {
-    char a[10] = "cd\0";
-    char pat[10] = "\\w*\0";
+    char a[10] = "9\0";
+    char pat[10] = "\\w+?\\d+\0";
     SPAN *span = re_match(pat, a);
     printf("%d %ld %ld\n", span->valid, (span->start - a) / sizeof(char), (span->end - a) / sizeof(char));
     return 0;
