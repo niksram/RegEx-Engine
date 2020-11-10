@@ -27,7 +27,7 @@ void re_match_star(BUCKET *bucket, char *pat, char *text, SPAN *span, int greedy
 void re_match_plus(BUCKET *bucket, char *pat, char *text, SPAN *span, int greedy);
 void re_match_question(BUCKET *bucket, char *pat, char *text, SPAN *span, int greedy);
 int re_in_bucket(BUCKET *bucket, char c);
-void free_bucket(BUCKET* bucket);
+void free_bucket(BUCKET *bucket);
 
 SPAN *re_match(char *pat, char *text)
 {
@@ -69,32 +69,40 @@ void re_match_here(char *pat, char *text, SPAN *span)
         close = 1;
         while (pat[close] != ']')
         {
-            if (pat[close] == '-')
+            if (pat[close] == '-' && pat[close - 1] != '[' && pat[close - 1] != '\\' && pat[close + 1] != ']')
             {
                 bucket->range_array_start[bucket->range_array_len] = pat[close - 1];
                 bucket->range_array_end[bucket->range_array_len++] = pat[close + 1];
             }
-            if (pat[close] != '-' && pat[close - 1] != '-' && pat[close + 1] != '-')
+            else if(pat[close]!='\\' || (pat[close-1]=='\\'))
             {
                 bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
             }
             close++;
         }
     }
-    else if (pat[0] == '\\' && (pat[1] == 'w' || pat[1] == 'd'))
+    else if (pat[0] == '\\')
     {
-        bucket->range_array_len = 1;
-        bucket->range_array_start[0] = '0';
-        bucket->range_array_end[0] = '9';
-        if (pat[1] == 'w')
+        if (pat[1] == 'w' || pat[1] == 'd')
         {
-            bucket->range_array_len = 3;
-            bucket->range_array_start[1] = 'A';
-            bucket->range_array_start[2] = 'a';
-            bucket->range_array_end[1] = 'Z';
-            bucket->range_array_end[2] = 'z';
+            bucket->range_array_len = 1;
+            bucket->range_array_start[0] = '0';
+            bucket->range_array_end[0] = '9';
+            if (pat[1] == 'w')
+            {
+                bucket->range_array_len = 3;
+                bucket->range_array_start[1] = 'A';
+                bucket->range_array_start[2] = 'a';
+                bucket->range_array_end[1] = 'Z';
+                bucket->range_array_end[2] = 'z';
+                bucket->indiv_array_len = 1;
+                bucket->indiv_array[0] = '_';
+            }
+        }
+        else
+        {
             bucket->indiv_array_len = 1;
-            bucket->indiv_array[0] = '_';
+            bucket->indiv_array[0] = pat[1];
         }
         close = 1;
     }
@@ -244,7 +252,7 @@ BUCKET *create_bucket(int len)
     return bucket;
 }
 
-void free_bucket(BUCKET* bucket)
+void free_bucket(BUCKET *bucket)
 {
     free(bucket->indiv_array);
     free(bucket->range_array_start);
@@ -285,9 +293,11 @@ int main()
         if (span->valid)
         {
             long int start = (span->start - string) / sizeof(char);
-            long int end = (span->end - string) / sizeof(char) - 1;
+            long int end = (span->end - string) / sizeof(char);
             if (start == end)
                 start = end = 0;
+            else
+                end--;
             printf("1 %ld %ld\n", start, end);
         }
         else
