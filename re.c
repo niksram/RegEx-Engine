@@ -28,22 +28,27 @@ void re_match_plus(BUCKET *bucket, char *pat, char *text, SPAN *span, int greedy
 void re_match_question(BUCKET *bucket, char *pat, char *text, SPAN *span, int greedy);
 int re_in_bucket(BUCKET *bucket, char c);
 void free_bucket(BUCKET *bucket);
+int bucket_maker(const char *s, BUCKET *bucket);
 
 SPAN *re_match(char *pat, char *text)
 {
     SPAN *span = re_init_span(text);
     if (*pat == '^')
     {
+        span->end = span->start = text;
         re_match_here(pat + 1, text, span);
     }
-    do
+    else
     {
-        span->end = span->start = text;
-        re_match_here(pat, text, span);
-        if (span->valid)
-            return span;
-        text++;
-    } while (*text != '\0' && *text != '\n');
+        do
+        {
+            span->end = span->start = text;
+            re_match_here(pat, text, span);
+            if (span->valid)
+                return span;
+            text++;
+        } while (*text != '\0' && *text != '\n');
+    }
     return span;
 }
 
@@ -58,58 +63,39 @@ void re_match_here(char *pat, char *text, SPAN *span)
     }
     if (pat[0] == '$' && (pat[1] == '\0' || pat[1] == '\n'))
     {
-        if (*text == '\0')
+        if (*text == '\0' || *text == '\n')
             span->valid = 1;
         return;
     }
-    BUCKET *bucket = create_bucket(30);
+    BUCKET *bucket = create_bucket(10);
     int close;
     if (pat[0] == '[')
     {
-        close = 1;
-        while (pat[close] != ']')
-        {
-            if (pat[close] == '-' && pat[close - 1] != '[' && pat[close - 1] != '\\' && pat[close + 1] != ']')
-            {
-                bucket->range_array_start[bucket->range_array_len] = pat[close - 1];
-                bucket->range_array_end[bucket->range_array_len++] = pat[close + 1];
-            }
-            else if(pat[close]!='\\' || (pat[close-1]=='\\'))
-            {
-                bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
-            }
-            close++;
-        }
+        close = bucket_maker(pat, bucket);
     }
     else if (pat[0] == '\\')
     {
-        if (pat[1] == 'w' || pat[1] == 'd')
+        if (pat[1] == 'w')
         {
-            bucket->range_array_len = 1;
-            bucket->range_array_start[0] = '0';
-            bucket->range_array_end[0] = '9';
-            if (pat[1] == 'w')
-            {
-                bucket->range_array_len = 3;
-                bucket->range_array_start[1] = 'A';
-                bucket->range_array_start[2] = 'a';
-                bucket->range_array_end[1] = 'Z';
-                bucket->range_array_end[2] = 'z';
-                bucket->indiv_array_len = 1;
-                bucket->indiv_array[0] = '_';
-            }
+            bucket_maker("[A-Za-z0-9_]", bucket);
+        }
+        else if (pat[1] == 'd')
+        {
+            bucket_maker("[0-9]", bucket);
         }
         else
         {
-            bucket->indiv_array_len = 1;
-            bucket->indiv_array[0] = pat[1];
+            bucket->indiv_array[bucket->indiv_array_len++] = pat[1];
         }
         close = 1;
     }
+    else if (pat[0] == '.')
+    {
+        bucket_maker("[.]", bucket);
+    }
     else
     {
-        bucket->indiv_array_len = 1;
-        bucket->indiv_array[0] = pat[0];
+        bucket->indiv_array[bucket->indiv_array_len++] = pat[0];
         close = 0;
     }
     if (pat[close + 1] == '*')
@@ -277,6 +263,46 @@ int re_in_bucket(BUCKET *bucket, char c)
         }
     }
     return 0;
+}
+
+int bucket_maker(const char *pat, BUCKET *bucket)
+{
+    int close = 1;
+    while (pat[close] != ']')
+    {
+        if (pat[close] == '-' && pat[close - 1] != '[' && pat[close - 1] != '\\' && pat[close + 1] != ']')
+        {
+            bucket->range_array_start[bucket->range_array_len] = pat[close - 1];
+            bucket->range_array_end[bucket->range_array_len++] = pat[close + 1];
+            close++;
+        }
+        else if (pat[close - 1] == '\\')
+        {
+            if (pat[1] == 'w')
+            {
+                bucket_maker("[A-Za-z0-9_]", bucket);
+            }
+            else if (pat[1] == 'd')
+            {
+                bucket_maker("[0-9]", bucket);
+            }
+            else
+            {
+                bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
+            }
+        }
+        else if (pat[close] == '.')
+        {
+            bucket->range_array_start[bucket->range_array_len] = 0;
+            bucket->range_array_end[bucket->range_array_len++] = 127;
+        }
+        else if (pat[close] != '\\' && pat[close+1] != '-')
+        {
+            bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
+        }
+        close++;
+    }
+    return close;
 }
 
 int main()
