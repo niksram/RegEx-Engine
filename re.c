@@ -83,6 +83,10 @@ void re_match_here(char *pat, char *text, SPAN *span)
         {
             bucket_maker("[0-9]", bucket);
         }
+        else if (pat[1] == 's')
+        {
+            bucket_maker("[ \t]", bucket);
+        }
         else
         {
             bucket->indiv_array[bucket->indiv_array_len++] = pat[1];
@@ -92,6 +96,7 @@ void re_match_here(char *pat, char *text, SPAN *span)
     else if (pat[0] == '.')
     {
         bucket_maker("[.]", bucket);
+        close=0;
     }
     else
     {
@@ -270,33 +275,34 @@ int bucket_maker(const char *pat, BUCKET *bucket)
     int close = 1;
     while (pat[close] != ']')
     {
-        if (pat[close] == '-' && pat[close - 1] != '[' && pat[close - 1] != '\\' && pat[close + 1] != ']')
+        if (pat[close] == '-' && pat[close - 1] != '[' && pat[close + 1] != ']')
         {
             bucket->range_array_start[bucket->range_array_len] = pat[close - 1];
             bucket->range_array_end[bucket->range_array_len++] = pat[close + 1];
             close++;
         }
-        else if (pat[close - 1] == '\\')
+        else if (pat[close] == '\\')
         {
-            if (pat[1] == 'w')
+            if (pat[close+1] == 'w')
             {
                 bucket_maker("[A-Za-z0-9_]", bucket);
             }
-            else if (pat[1] == 'd')
+            else if (pat[close+1] == 'd')
             {
                 bucket_maker("[0-9]", bucket);
             }
             else
             {
-                bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
+                bucket->indiv_array[bucket->indiv_array_len++] = pat[close+1];
             }
+            close++;
         }
         else if (pat[close] == '.')
         {
             bucket->range_array_start[bucket->range_array_len] = 0;
             bucket->range_array_end[bucket->range_array_len++] = 127;
         }
-        else if (pat[close] != '\\' && pat[close+1] != '-')
+        else if ( pat[close+1] != '-')
         {
             bucket->indiv_array[bucket->indiv_array_len++] = pat[close];
         }
@@ -305,21 +311,51 @@ int bucket_maker(const char *pat, BUCKET *bucket)
     return close;
 }
 
+char *string_strip(char *s,long int len)
+{
+    long int i=0;
+    char *strip = (char *)calloc((len+1),sizeof(char));
+    while(s[i]!='\n' && s[i]!='\0')
+    {
+        strip[i]=s[i];
+        i++;
+    }
+    strip[i] = '\0';
+    return strip;
+}
+
+int string_to_num(char*s)
+{
+    int n=0,i=0;
+    while(s[i]<='9' && s[i]>='0')
+    {
+        n*=10;
+        n+=(s[i]-'0');
+        i++;
+    }
+    return n;
+}
+
 int main()
 {
-    char *string = (char *)malloc((STRSIZE + 1) * sizeof(char));
-    char *pat = (char *)malloc((PATSIZE + 1) * sizeof(char));
-    int n;
-    fgets(string, STRSIZE + 1, stdin);
-    scanf("%d\n", &n);
+    char *string = (char *)calloc((STRSIZE + 1) , sizeof(char));
+    char *pat = (char *)calloc((PATSIZE + 1) , sizeof(char));
+    char* num=(char*)calloc(5,sizeof(char));
+    fgets(string, STRSIZE, stdin);
+    fgets(num,5,stdin);
+    char* stripped_string=string_strip(string,STRSIZE);
+    int n=string_to_num(num);
+    free(num);
+    free(string);
     for (int i = 0; i < n; i++)
     {
-        fgets(pat, PATSIZE + 1, stdin);
-        SPAN *span = re_match(pat, string);
+        fgets(pat, PATSIZE, stdin);
+        char* stripped_pat=string_strip(pat,PATSIZE);
+        SPAN *span = re_match(stripped_pat, stripped_string);
         if (span->valid)
         {
-            long int start = (span->start - string) / sizeof(char);
-            long int end = (span->end - string) / sizeof(char);
+            long int start = (span->start - stripped_string) / sizeof(char);
+            long int end = (span->end - stripped_string) / sizeof(char);
             if (start == end)
                 start = end = 0;
             else
@@ -331,8 +367,9 @@ int main()
             printf("0\n");
         }
         free(span);
+        free(stripped_pat);
     }
-    free(string);
+    free(stripped_string);
     free(pat);
     return 0;
 }
