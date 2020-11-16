@@ -1,0 +1,27 @@
+S NIKHIL RAM
+PES1201801972
+
+DATA STRUCTURES
+
+    SPAN:-
+        the following structure is uses to preserve the span from start to end till which the match is made
+        the span output has a valid integer which indicates whether a valid match was found or not
+        ** the range is left inclusive and right non-inclusive similar to python
+        this is then modified in the main as per the given convention
+
+    BUCKET:-
+        its used to preserve a character class as a structure
+        it consists of 3 arrays
+        indiv_array:- stores individual characters
+        range_array_start:- stores the corresponding start point
+        range_array_end:- stores the corresponding end point
+
+IMPLEMENTAION:-
+
+the current regex apart from the given macros (\w \d and generic character class), the implementation includes even \s to match spaces.
+greedy and non-greedy *,+,? are also taken into consideration completely
+a recursive approach is taken and implemented to perform regex search.
+
+the core function is 'regex_match_here' which performs match recursively.
+
+the detailed explaination of the implementation is in the comments so please do go through it.
