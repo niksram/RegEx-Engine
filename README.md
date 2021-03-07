@@ -1,4 +1,4 @@
-# ReGex-Engine
+# RegEx-Engine
 ---
 - Simple C implementation to perform Regex Match
 - Implementation works for the following macros
